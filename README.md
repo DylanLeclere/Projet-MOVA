@@ -1,240 +1,161 @@
-# Projet-MOVA
-Application de casier autonome
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>MOVA - Casiers du Futur</title>
-  <link href="style.css" rel="stylesheet">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"/>
-</head>
-<body>
-  <header>
-    <h1 class="logo">MOVA</h1>
-    <p class="slogan">Le casier qui vous suit partout</p>
-  </header>
+"use client";
+import { useState, useEffect } from "react";
+import { MapContainer, TileLayer, Marker, Popup, CircleMarker } from "react-leaflet";
+import "leaflet/dist/leaflet.css";
+import QRCode from "react-qr-code";
 
-  <main>
-    <section class="hero">
-      <button class="btn-primary" id="reserve-btn">🚀 Réserver un casier</button>
-    </section>
+const lockers = [
+  { id: 1, name: "MOVA - Les Papeteries", position: [45.9038, 6.1215], available: 2, total: 8 },
+  { id: 2, name: "MOVA - Centre Courier", position: [45.8994, 6.1295], available: 0, total: 12 },
+  { id: 3, name: "MOVA - Place de la Mairie", position: [45.8999, 6.1281], available: 7, total: 10 },
+];
 
-    <section id="map-section" style="display:none;">
-      <h2>📍 Localisation</h2>
-      <div id="map"></div>
-      <button class="btn-secondary" id="go-reservation">Continuer</button>
-    </section>
+export default function MovaApp() {
+  const [selectedLocker, setSelectedLocker] = useState(null);
+  const [duration, setDuration] = useState(null);
+  const [reserved, setReserved] = useState(false);
+  const [qrValue, setQrValue] = useState("");
+  const [timeLeft, setTimeLeft] = useState(null);
 
-    <section id="reservation-section" style="display:none;">
-      <h2>📝 Réservation</h2>
-      <form id="reservation-form">
-        <input type="text" placeholder="Votre nom" required />
-        <input type="email" placeholder="Votre email" required />
-        <select id="duration">
-          <option value="1">2h - 2€</option>
-          <option value="2">5h - 3,5€</option>
-          <option value="4">12h - 10€</option>
-          <option value="ME">abonée - abonée</option>
-        </select>
-        <button type="submit" class="btn-primary">💳 Procéder au paiement</button>
-      </form>
-    </section>
+  // Compte à rebours
+  useEffect(() => {
+    if (!timeLeft || timeLeft <= 0) return;
+    const timer = setInterval(() => setTimeLeft((t) => t - 1), 1000);
+    return () => clearInterval(timer);
+  }, [timeLeft]);
 
-    <section id="qr-section" style="display:none;">
-      <h2>✅ Votre QR code</h2>
-      <canvas id="qr-code"></canvas>
-      <p class="timer">⏳ Temps restant : <span id="countdown"></span></p>
-      <button id="unlock-btn" class="btn-secondary">🔓 Déverrouiller</button>
-    </section>
+  const handleReserve = (locker) => {
+    if (locker.available === 0) return alert("Ce casier est complet.");
+    setSelectedLocker(locker);
+  };
 
-    <section id="final-qr" style="display:none;">
-      <h2>🔑 QR Code de déverrouillage</h2>
-      <canvas id="unlock-qr"></canvas>
-    </section>
-  </main>
+  const handlePayment = (minutes) => {
+    // Simulation du paiement Apple Pay / Google Pay
+    const durations = { 60: 1.5, 120: 2.5, 240: 4.0, 1440: 6.0 };
+    alert(`Paiement de ${durations[minutes]} € validé ✅`);
+    setDuration(minutes);
+    const uniqueQR = `MOVA-${Date.now()}`;
+    setQrValue(uniqueQR);
+    setReserved(true);
+    setTimeLeft(minutes * 60); // en secondes
+  };
 
-  <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
-  <script src="script.js"></script>
-</body>
-</html>
-body {
-  background: #000;
-  color: #fff;
-  font-family: 'Inter', sans-serif;
-  margin: 0;
-  padding: 0;
-  text-align: center;
+  const handleBackHome = () => {
+    setReserved(false);
+    setSelectedLocker(null);
+    setDuration(null);
+    setQrValue("");
+    setTimeLeft(null);
+  };
+
+  return (
+    <div
+      style={{
+        backgroundColor: "#0D0D0D",
+        color: "#E3C6A5",
+        fontFamily: "Poppins, sans-serif",
+        height: "100vh",
+        textAlign: "center",
+      }}
+    >
+      <h1 style={{ padding: "1rem 0" }}>MOVA – Le casier qui vous suit partout 🏍️</h1>
+
+      {/* Vue principale */}
+      {!selectedLocker && !reserved && (
+        <MapContainer center={[45.8994, 6.1295]} zoom={14} style={{ height: "85vh", width: "100%" }}>
+          <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+          {lockers.map((locker) => (
+            <div key={locker.id}>
+              <CircleMarker
+                center={locker.position}
+                radius={14}
+                color={locker.available === 0 ? "#FF3B30" : "#34C759"}
+                fillOpacity={0.9}
+                eventHandlers={{ click: () => handleReserve(locker) }}
+              />
+              <Marker position={locker.position}>
+                <Popup>
+                  <h3>{locker.name}</h3>
+                  <p>
+                    Disponibles : <b>{locker.available}</b> / {locker.total}
+                  </p>
+                  {locker.available === 0 ? (
+                    <span style={{ color: "#FF3B30" }}>❌ Complet</span>
+                  ) : (
+                    <button
+                      onClick={() => handleReserve(locker)}
+                      style={{
+                        backgroundColor: "#E3C6A5",
+                        border: "none",
+                        color: "#0D0D0D",
+                        padding: "0.5rem 1rem",
+                        borderRadius: "6px",
+                        cursor: "pointer",
+                      }}
+                    >
+                      Réserver
+                    </button>
+                  )}
+                </Popup>
+              </Marker>
+            </div>
+          ))}
+        </MapContainer>
+      )}
+
+      {/* Étape 2 – Choix durée */}
+      {selectedLocker && !reserved && (
+        <div style={{ marginTop: "2rem" }}>
+          <h2>{selectedLocker.name}</h2>
+          <p>Choisissez votre durée :</p>
+          <div style={{ display: "flex", justifyContent: "center", gap: "1rem", flexWrap: "wrap" }}>
+            <button onClick={() => handlePayment(60)}>1h – 1,50 €</button>
+            <button onClick={() => handlePayment(120)}>2h – 2,50 €</button>
+            <button onClick={() => handlePayment(240)}>4h – 4,00 €</button>
+            <button onClick={() => handlePayment(1440)}>Journée – 6,00 €</button>
+          </div>
+          <button
+            onClick={handleBackHome}
+            style={{ marginTop: "2rem", background: "none", color: "#999", border: "none" }}
+          >
+            ← Retour à la carte
+          </button>
+        </div>
+      )}
+
+      {/* Étape 3 – QR & Timer */}
+      {reserved && (
+        <div style={{ marginTop: "2rem" }}>
+          <h2>🎟️ Réservation confirmée</h2>
+          <p>Scannez ce QR code pour accéder à votre casier :</p>
+          <div style={{ background: "white", display: "inline-block", padding: "1rem", marginTop: "1rem" }}>
+            <QRCode value={qrValue} />
+          </div>
+          <p style={{ marginTop: "1rem" }}>Code : {qrValue}</p>
+          <p>⏳ Temps restant : {Math.floor(timeLeft / 60)} min {timeLeft % 60}s</p>
+
+          {timeLeft <= 0 && (
+            <div style={{ marginTop: "1rem" }}>
+              <h3>Votre session est terminée.</h3>
+              <button
+                onClick={handleBackHome}
+                style={{
+                  marginTop: "1rem",
+                  backgroundColor: "#E3C6A5",
+                  color: "#0D0D0D",
+                  border: "none",
+                  padding: "0.5rem 1rem",
+                  borderRadius: "6px",
+                }}
+              >
+                Retour à l’accueil
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      <footer style={{ marginTop: "1rem", color: "#999" }}>© 2025 MOVA</footer>
+    </div>
+  );
 }
-
-header {
-  padding: 20px;
-}
-
-.logo {
-  font-size: 3em;
-  font-weight: 800;
-  color: #fddbb0;
-  text-shadow: 0 0 20px rgba(253, 219, 176, 0.7);
-}
-
-.slogan {
-  font-size: 1.2em;
-  color: #aaa;
-  margin-bottom: 20px;
-}
-
-h2 {
-  color: #fddbb0;
-  text-shadow: 0 0 15px rgba(253, 219, 176, 0.5);
-}
-
-#map {
-  height: 300px;
-  width: 100%;
-  margin: 20px auto;
-  border-radius: 10px;
-  overflow: hidden;
-}
-
-form {
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-  padding: 20px;
-}
-
-input, select {
-  padding: 12px;
-  border: none;
-  border-radius: 8px;
-  font-size: 1em;
-  outline: none;
-}
-
-.btn-primary {
-  background: linear-gradient(90deg, #fddbb0, #ff9f50);
-  color: #000;
-  padding: 15px;
-  font-size: 1.1em;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: bold;
-  box-shadow: 0 0 20px rgba(253, 219, 176, 0.8);
-  transition: all 0.3s ease;
-}
-
-.btn-primary:hover {
-  transform: scale(1.05);
-  box-shadow: 0 0 30px rgba(253, 219, 176, 1);
-}
-
-.btn-secondary {
-  background: transparent;
-  color: #fddbb0;
-  border: 2px solid #fddbb0;
-  padding: 12px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.btn-secondary:hover {
-  background: #fddbb0;
-  color: #000;
-}
-
-canvas {
-  margin-top: 15px;
-  filter: drop-shadow(0 0 10px rgba(253, 219, 176, 0.8));
-}
-
-.timer {
-  margin-top: 15px;
-  font-size: 1.2em;
-  color: #fddbb0;
-}
-
-@media (max-width: 600px) {
-  .logo {
-    font-size: 2em;
-  }
-  #map {
-    height: 200px;
-  }
-}
-const reserveBtn = document.getElementById("reserve-btn");
-const mapSection = document.getElementById("map-section");
-const reservationSection = document.getElementById("reservation-section");
-const reservationForm = document.getElementById("reservation-form");
-const qrSection = document.getElementById("qr-section");
-const finalQRSection = document.getElementById("final-qr");
-
-const qrCanvas = document.getElementById("qr-code");
-const unlockCanvas = document.getElementById("unlock-qr");
-const unlockBtn = document.getElementById("unlock-btn");
-const countdown = document.getElementById("countdown");
-
-let durationMinutes = 120;
-
-function generateQR(canvas, text) {
-  QRCode.toCanvas(canvas, text, { width: 200 }, function (error) {
-    if (error) console.error(error);
-  });
-}
-
-// Flow navigation
-reserveBtn.addEventListener("click", () => {
-  mapSection.style.display = "block";
-});
-
-document.getElementById("go-reservation").addEventListener("click", () => {
-  mapSection.style.display = "none";
-  reservationSection.style.display = "block";
-});
-
-// Handle reservation
-reservationForm.addEventListener("submit", (e) => {
-  e.preventDefault();
-  reservationSection.style.display = "none";
-  qrSection.style.display = "block";
-
-  durationMinutes = parseInt(document.getElementById("duration").value) * 60;
-
-  generateQR(qrCanvas, "reservation-" + Date.now());
-
-  // Timer
-  let endTime = new Date(Date.now() + durationMinutes * 60000);
-  let timerInterval = setInterval(() => {
-    let now = new Date();
-    let remaining = endTime - now;
-    if (remaining <= 0) {
-      countdown.innerText = "Temps écoulé";
-      clearInterval(timerInterval);
-      return;
-    }
-    let mins = Math.floor((remaining / 60000) % 60);
-    let hrs = Math.floor((remaining / 3600000));
-    countdown.innerText = `${hrs}h ${mins}min`;
-  }, 1000);
-});
-
-// Unlock
-unlockBtn.addEventListener("click", () => {
-  finalQRSection.style.display = "block";
-  generateQR(unlockCanvas, "unlock-" + Date.now());
-});
-
-// Map
-const map = L.map('map', {
-  zoomControl: false,
-  attributionControl: false
-}).setView([45.8992, 6.1294], 16);
-
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-
-L.marker([45.8992, 6.1294]).addTo(map)
-  .bindPopup("Casier MOVA – Centre Courier, Annecy").openPopup();
-  
